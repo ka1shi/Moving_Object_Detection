@@ -1,0 +1,475 @@
+// myFolder is path for images 
+
+myFolder = 'F:\CODE\MATLAB\bin\WavingTrees\WavingTrees';
+Pd_path = myFolder;
+
+if ~isdir(myFolder)
+    errorMessage = sprintf('Error : The following folder does not exist: \n%s',myFolder);
+    uiwait(warndlg(errorMessage));
+    return;
+end
+
+// r_path is path for results
+r_path = 'F:\CODE\MATLAB\bin\WavingTrees\ResultWT\';
+filePattern = fullfile(myFolder,'*.bmp');
+bmpFiles = dir(filePattern);
+
+int N = 35; // Number of components of background model
+int min=2; // Number of components that has to be closer than decision threshold for the pixel to be in background
+double Rid = 0.05; // rate of controlling of decision threshold(DT)
+double Rlow = 18; // lower bound of DT
+double Rscale = 5; // Scaling factor for DT control
+double Tdec = 0.05; // rate of decrease of learning rate
+double Tinc = 1; // rate of increase of learning rate
+double Tlow = 2; // lower bound of learning rate
+double Tup = 200; // upper bound of learning rate
+double aph = 10; // optimal weighing parameter
+
+double mindisR = double.MAX_VALUE, mindisG = double.MAX_VALUE, mindisB = double.MAX_VALUE; 
+
+    double gx[][] = {-1, 0, 1; -2, 0, 2; -1, 0, 1}; // sobel filters for gradient calculation
+    double gy[][] = {-1, -2, -1; 0, 0, 0; 1, 2, 1};
+    
+    double RchannelV[][][] = new double[120][160][N];  // value of red channel pixels
+    double GchannelV[][][] = new double[120][160][N];  // value of green channel pixels
+    double BchannelV[][][] = new double[120][160][N];  //value of blue channel pixels
+    
+    double RchannelM[][][] = new double[120][160][N]; // gradient of red channel pixels
+    double GchannelM[][][] = new double[120][160][N]; // gradient of green channel pixels
+    double BchannelM[][][] = new double[120][160][N]; // gradient of blue channel pixels
+    
+    double IF[][] = new double[120][160];
+
+// FORMATION OF BACKGROUND MODEL
+for(int i=0; i<N; i++)
+{
+    //baseFileName = bmpFiles(i).name;
+    //fullFileName = fullfile(myFolder, baseFileName);
+    //fprintf(1, 'Now reading %s\n',fullFileName);
+    //imageArray = double(imread(fullFileName));
+
+    
+    //rV = imageArray(:,:,1);
+   
+    //gV = imageArray(:,:,2);
+    
+    //bV = imageArray(:,:,3);
+    
+    //RchannelV(:,:,i) = rV;  
+    //GchannelV(:,:,i) = gV;  
+    //BchannelV(:,:,i) = bV;  
+    
+    
+    //rM = (conv2(rV,gx,'same')).^2+(conv2(rV,gy,'same')).^2;
+    //gM = (conv2(gV,gx,'same')).^2+(conv2(gV,gy,'same')).^2;
+    //bM = (conv2(bV,gx,'same')).^2+(conv2(bV,gy,'same')).^2;
+    
+    //RchannelM(:,:,i) = rM;  
+    //GchannelM(:,:,i) = gM;  
+    //BchannelM(:,:,i) = bM;  
+    //imwrite(IF,[r_path,bmpFiles(i).name]);
+    //imshow(imageArray); %Display image
+    //drawnow; %Force display to update immediately
+}
+
+     double RR[][] = new double[120][160]; // decision threshold define for every individual pixel's red value
+     double RG[][] = new double[120][160]; // decision threshold define for every individual pixel's green value
+     double RB[][] = new double[120][160]; // decision threshold define for every individual pixel's blue value
+        
+     //RR(:)= 20; // Initialization of decision threshold
+     //RG(:)= 20;
+     //RB(:)= 20; 
+     
+     double DR[][] = new double[120][160]; // stores dmin values and changes everytime when background model is updated(for red)
+     double DG[][] = new double[120][160];
+     double DB[][] = new double[120][160];
+     
+     double TR[][] = new double[120][160]; // stores learning rate values of red and update everytime background model is updated
+     double TG[][] = new double[120][160];
+     double TB[][] = new double[120][160];
+        
+     //TR(:)=5; //Initialization of learning rate
+     //TG(:)=5;
+     //TB(:)=5;
+     
+     double pR[][] = new double[120][160]; // probability
+     double pG[][] = new double[120][160];
+     double pB[][] = new double[120][160];
+     
+     //pR(:)=0.2; // Initialization of probability
+     //pG(:)=0.2;
+     //pB(:)=0.2;
+        
+for(i=N; i<len; i++)
+        
+     double countR[][] = new double[120][160];
+     double countG[][] = new double[120][160];
+     double countB[][] = new double[120][160];
+     
+     double FR[][] = new double[120][160]; //result for red channel
+     double FG[][] = new double[120][160]; //result for green channel
+     double FB[][] = new double[120][160]; //result for blue channel
+        
+        //baseFileName = bmpFiles(i).name;
+        //fullFileName = fullfile(myFolder, baseFileName);
+        //imageArray = double(imread(fullFileName));
+        
+        //rV = imageArray(:, :, 1);
+        //gV = imageArray(:, :, 2);
+        //bV = imageArray(:, :, 3);
+        
+        //rM = (conv2(rV,gx,'same')).^2+(conv2(rV,gy,'same')).^2; 
+        //gM = (conv2(gV,gx,'same')).^2+(conv2(gV,gy,'same')).^2;
+        //bM = (conv2(bV,gx,'same')).^2+(conv2(bV,gy,'same')).^2;
+        
+        //gradientR = sum(rM(:))/size(rV, 1)*size(rV, 2);
+        //gradientG = sum(gM(:))/size(gV, 1)*size(gV, 2);
+        //gradientB = sum(bM(:))/size(bV, 1)*size(bV, 2);     
+        
+        for(j=0; j<120; j++)
+        {
+            for(k=0; k<160; k++)
+            {
+                mindisR = double.MAX_VALUE;
+                mindisG = double.MAX_VALUE;
+                mindisB = double.MAX_VALUE;
+        
+                //r = imageArray(j, k, 1);
+                //g = imageArray(j, k, 2);
+                //b = imageArray(j, k, 3);
+                
+                r1 = rM[j, k];
+                g1 = gM[j, k];
+                b1 = bM[j, k];
+
+                // DECISION MAKING
+                for(l=0; l<N; l++)
+                {    
+                    if((Math.abs(RchannelV[j, k, l]-r)+(aph/gradientR)*Math.abs(RchannelM[j, k, l]-r1))< RR[j, k])
+                    {
+                        countR[j, k] = countR[j, k]+1;
+                    }
+                    if((Math.abs(GchannelV[j, k, l]-g)+(aph/gradientG)*Math.abs(GchannelM[j, k, l]-g1))< RG[j, k])
+                    {
+                        countG[j, k] = countG[j, k]+1;
+                    }
+                    if((Math.abs(BchannelV[j, k, l]-b)+(aph/gradientB)*Math.abs(BchannelM[j, k, l]-b1))< RB[j, k])
+                    {
+                        countB[j, k] = countB[j, k]+1;
+                    }
+                }
+
+                if(countR[j, k]<min)
+                       FR[j, k]=1;
+                
+                if(countG[j, k]<min)
+                    FG[j, k]=1;
+                
+                if(countB[j, k]<min)
+                       FB[j, k]=1;
+                
+                
+                // UPDATE OF BACKGROUND MODEL of red channel value
+        
+                if (FR[j, k]==0 && pR[j, k]>=(1/200))
+                {
+                    x = 1+9*rand;
+                    x = uint32(round(x));
+                    RchannelM(j, k, x)=r1; // update of random frame no x (gradient)with curent frame
+                    RchannelV(j, k, x)=r; // update of random frame no x (value)with current frame
+                }
+                //if (pR(j, k)>=(1/200))
+                    //a = 1+9*rand;
+                    //a = uint32(round(a));
+                    //b = 1+7*rand;
+                    //b = uint32(round(b));
+                    
+                    /*if (b==1)
+                        x = j-1; y=k-1;
+                    elseif(b==2)
+                            x = j-1; y=k;
+                    elseif(b==3)
+                            x = j-1; y=k+1;
+                    elseif(b==4)
+                            x = j; y=k-1;
+                    elseif(b==5)
+                        x = j; y=k+1;
+                    elseif(b==6)
+                            x = j+1; y=k-1;
+                    elseif(b==7)
+                            x = j+1; y=k;
+                        else
+                            x = j+1; y=k+1;
+                    end
+                    if(x<=0 || y<=0)
+                        x=2;
+                        y=2;
+                    end
+                    if(x>=121 || y>=161)
+                        x=x-2;
+                        y=y-2;
+                    end
+                    x = uint32(x);
+                    y = uint32(y);
+                    if(x~=0 && y~=0 && x~=121 && y~=161)
+                    RchannelV(x, y, a)=imageArray(x, y, 1); % update of neighbouring pixel(value) 
+                    RchannelM(x, y, a)= rM(x, y); %update of neighbouring pixel(gradient) 
+                    end
+                end*/
+                
+                // UPDATE OF BACKGROUND MODEL of green channel value
+                
+                if (FG[j, k]==0 && pG[j, k]>=(1/200))
+                {
+                    x = 1+9*rand;
+                    x = uint32(round(x));
+                    GchannelM(j, k, x)=g1; %update of random frame no x (gradient)with curent frame
+                    GchannelV(j, k, x)=b; %update of random frame no x (value)with current frame
+                }
+                /*if (pG(j, k)>=(1/200))
+                    a = 1+9*rand;
+                    a = uint32(round(a));
+                    b = 1+7*rand;
+                    b = uint32(round(b));
+                    
+                    if (b==1)
+                        x = j-1; y=k-1;
+                    elseif(b==2)
+                            x = j-1; y=k;
+                    elseif(b==3)
+                            x = j-1; y=k+1;
+                    elseif(b==4)
+                            x = j; y=k-1;
+                    elseif(b==5)
+                        x = j; y=k+1;
+                    elseif(b==6)
+                            x = j+1; y=k-1;
+                    elseif(b==7)
+                            x = j+1; y=k;
+                        else
+                            x = j+1; y=k+1;
+                    end
+                     if(x<=0 || y<=0)
+                        x=2;
+                        y=2;
+                    end
+                    if(x>=121 || y>=161)
+                        x=x-2;
+                        y=y-2;
+                    end
+                    x = uint32(x);
+                    y = uint32(y);
+                    if(x~=0 && y~=0 && x~=121 && y~=161)
+                    GchannelV(x, y, a)=imageArray(x, y, 2); % update of neighbouring pixel(value) 
+                    GchannelM(x, y, a)= gM(x, y); %update of neighbouring pixel(gradient) 
+                    end
+                end*/
+                
+                // UPDATE OF BACKGROUND MODEL of blue channel value
+                
+                if (FB[j, k]==0 && pB[j, k]>=(1/200))
+                {
+                    x = 1+34*rand;
+                    x = uint32(round(x));
+                    BchannelM(j, k, x)=b1; %update of random frame no x (gradient)with curent frame
+                    BchannelV(j, k, x)=b; %update of random frame no x (value)with current frame
+                }
+                /*if (pB(j, k)>=(1/200))
+                    a = 1+34*rand; % determine which frame to update in N frames
+                    a = uint32(round(a));
+                    b = 1+7*rand; %determine which neighbouring pixel is update
+                    b = uint32(round(b));
+                    
+                    if (b==1)
+                        x = j-1; y=k-1;
+                    elseif(b==2)
+                            x = j-1; y=k;
+                    elseif(b==3)
+                            x = j-1; y=k+1;
+                    elseif(b==4)
+                            x = j; y=k-1;
+                    elseif(b==5)
+                        x = j; y=k+1;
+                    elseif(b==6)
+                            x = j+1; y=k-1;
+                    elseif(b==7)
+                            x = j+1; y=k;
+                        else
+                            x = j+1; y=k+1;
+                    end
+                    if(x<=0 || y<=0)
+                        x=2;
+                        y=2;
+                    end
+                    if(x>=121 || y>=161)
+                        x=x-2;
+                        y=y-2;
+                    end
+                    x = uint32(x);
+                    y = uint32(y);
+                    if(x~=0 && y~=0 && x~=121 && y~=161)
+                    BchannelV(x, y, a)=imageArray(x, y, 3); % update of neighbouring pixel(value) 
+                    BchannelM(x, y, a)= bM(x, y); %update of neighbouring pixel(gradient)
+                    end
+                end*/
+        
+                //  UPDATE OF Dmin of red channel
+                for(l=0; l<N; l++)
+                {
+                    if(mindisR>(Math.abs(RchannelV[j, k, l]-r)+(aph/gradientR)*Math.abs(RchannelM[j, k, l]-r1)))
+                    {
+                       mindisR = Math.abs(RchannelV[j, k, l]-r)+(aph/gradientR)*Math.abs(RchannelM[j, k, l]-r1);
+                       DR[j, k]=mindisR;
+                    }
+                }
+              
+                // UPDATE OF Dmin of green channel
+                for(l=0; l<N; l++)
+                {
+                    if(mindisG>(Math.abs(GchannelV[j, k, l]-g)+(aph/gradientG)*Math.abs(GchannelM[j, k, l]-g1)))
+                    {
+                       mindisG = Math.abs(GchannelV[j, k, l]-g)+(aph/gradientG)*Math.abs(GchannelM[j, k, l]-g1);
+                       DG[j, k]=mindisG;
+                    }
+                }
+
+                // UPDATE OF Dmin of blue channel
+                for(l=0; l<N; l++)
+                {
+                    if(mindisB>(Math.abs(BchannelV[j, k, l]-b)+(aph/gradientB)*Math.abs(BchannelM[j, k, l]-b1)))
+                    {  
+                       mindisB = Math.abs(BchannelV[j, k, l]-b)+(aph/gradientB)*Math.abs(BchannelM[j, k, l]-b1);
+                       DB[j, k]=mindisB;
+                    }
+                }
+           
+                // UPDATE OF DECISION THRESHOLD of red channel
+                if(RR[j, k]>DR[j, k]*Rscale)
+                    RR[j, k] = RR[j, k]*(1-Rid);
+                else
+                    RR[j, k] = RR[j, k]*(1+Rid);
+                
+                if(RR[j, k]<Rlow)
+                {
+                    RR[j, k]=Rlow;
+                }
+                    
+                
+                
+                // UPDATE OF DECISION THRESHOLD of green channel
+                if(RG[j, k]>DG[j, k]*Rscale)
+                    RG[j, k] = RG[j, k]*(1-Rid);
+                else
+                    RG[j, k] = RG[j, k]*(1+Rid);
+            
+                if(RG(j, k)<Rlow)
+                {
+                    RG[j, k]=Rlow;
+                }
+                
+                // UPDATE OF DECISION THRESHOLD of blue channel
+                if(RB[j, k]>DB[j, k]*Rscale)
+                    RB[j, k] = RB[j, k]*(1-Rid);
+                else
+                    RB[j, k] = RB[j, k]*(1+Rid);
+                
+                if(RB[j, k]<Rlow)
+                {
+                    RB[j, k]=Rlow;
+                }
+                
+           
+                // UPDATE OF LEARNING RATE of red channel
+                
+                if (FR[j, k]==1)
+                {
+                    TR[j, k] = TR[j, k] + (Tinc/DR[j, k]);
+                    pR[j, k] = 1/TR[j, k];
+                }
+                else
+                {
+                    TR[j, k] = TR[j, k] - (Tdec/DR[j, k]);
+                    pR[j, k] = 1/TR[j, k];
+                }
+                
+                if(TR[j, k]<Tlow)
+                {
+                    TR[j, k]=Tlow;
+                    pR[j, k] = 1/TR[j, k];
+                }
+                if(TR[j, k]>Tup)
+                {
+                    TR[j, k]=Tup;
+                    pR[j, k] = 1/TR[j, k];
+                }
+                
+                
+                // UPDATE OF LEARNING RATE of green channel
+                
+                if (FG[j, k]==1)
+                {
+                    TG[j, k] = TG[j, k] + (Tinc/DG[j, k]);
+                    pG[j, k] = 1/TG[j, k];
+                }
+                else
+                {
+                    TG[j, k] = TG[j, k] - (Tdec/DG[j, k]);
+                    pG[j, k] = 1/TG[j, k];
+                }
+                
+                if(TG[j, k]<Tlow)
+                {
+                    TG[j, k]=Tlow;
+                    pG[j, k] = 1/TG[j, k];
+                }
+                if(TG[j, k]>Tup)
+                {
+                    TG[j, k]=Tup;
+                    pG[j, k] = 1/TG[j, k];
+                }
+                
+                
+                // UPDATE OF LEARNING RATE of blue channel
+                
+                if(FB[j, k]==1)
+                {
+                    TB[j, k] = TB[j, k] + (Tinc/DB[j, k]);
+                    pB[j, k] = 1/TB[j, k];
+                }
+                else
+                {
+                    TB[j, k] = TB[j, k] - (Tdec/DB[j, k]);
+                    pB[j, k] = 1/TB[j, k];
+                }
+                
+                if(TB[j, k]<Tlow)
+                {
+                    TB[j, k]=Tlow;
+                    pB[j, k] = 1/TB[j, k];
+                }
+                if(TB[j, k]>Tup)
+                {
+                    TB[j, k]=Tup;
+                    pB[j, k] = 1/TB[j, k];
+                }
+            }
+        }
+        
+        // IMAGE FORMATION
+        
+        double F[][] = new double[120][160]; // final result OR of all three channels
+        //F = or(FR, FB);
+        //F = or(F, FG);
+        //FResult = or(FResult, FG);
+        
+        //r_name = num2str(i);
+        //imwrite(F,[r_path,bmpFiles(i).name]);
+        //title('Binary Results');
+}
+
+
+
+    
+
+    
+    
